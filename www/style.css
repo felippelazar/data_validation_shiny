@@ -1,0 +1,120 @@
+/*-- scss:defaults --*/
+
+/*-- scss:rules --*/
+.control-label, .form-label {
+  background-color: #e9eff5 !important;
+  color: #2c3e50 !important;
+  padding: 6px 10px !important;
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
+}
+
+/* File input group */
+.shiny-input-container input[type=file] {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  width: 100% !important;
+}
+
+/* File input button (Browse) */
+.shiny-input-container .btn {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.shiny-input-container .form-control,
+.shiny-input-container .selectize-input,
+.shiny-input-container .shiny-input-text {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  box-sizing: border-box !important;
+}
+
+.shiny-input-container:has(input[type=file]) input[readonly] {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 8px !important;
+}
+
+.main-panel {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+.card-header {
+      min-height: 60px; /* increased height */
+      display: flex;
+      align-items: center; /* vertically centers the text */
+}
+
+.found-words {
+  font-size: 0.9rem;
+  padding-left: 5px;
+  margin-top: -10px;
+}
+
+.nav-button-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 15px 0px;
+}
+
+.btn-nav {
+  min-width: 10px; 
+  max-width: 120px;
+  width: 50px;
+  height: 40px;
+  padding: 8px 5px; 
+}
+
+.n-current {
+  padding: 5px 5px;
+}
+
+.card .highlighted-text, .card-body .highlighted-text {
+  display: inline !important;
+  background-color: #FFFF00 !important;
+  font-weight: 600 !important;
+}
+
+.html-fill-container .card-body {
+  display: block !important;
+}
+
+/* Or target a specific div inside the card */
+.html-fill-container .inline-area {
+  display: block !important;
+}
+
+.table {
+  width: 100% !important;
+}
+
+.navbar-static-top {
+  height: 45px;
+  padding: 4px 4px;
+}
+
+.accordion-button:not(.collapsed) {
+  background: #2c3e50;         /* Example: green background */
+  color: #fff;                 /* Optional: white text */
+  /* Add other styles as needed */
+}
