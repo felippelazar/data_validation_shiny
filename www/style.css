@@ -80,7 +80,7 @@
 .btn-nav {
   min-width: 10px; 
   max-width: 120px;
-  width: 50px;
+  width: 60px;
   height: 40px;
   padding: 8px 5px; 
 }
@@ -113,8 +113,10 @@
   padding: 4px 4px;
 }
 
+.accordion {
+  margin: 5px 0px;
+}
+
 .accordion-button:not(.collapsed) {
-  background: #2c3e50;         /* Example: green background */
-  color: #fff;                 /* Optional: white text */
-  /* Add other styles as needed */
+  background: rgba(33, 37, 41, 0.03);
 }

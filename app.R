@@ -5,9 +5,9 @@ library(ggplot2)
 library(readxl)
 library(arrow)
 library(janitor)
-options(shiny.maxRequestSize = 300 * 1024^2)
 library(bslib)
 library(glue)
+options(shiny.maxRequestSize = 300 * 1024^2)
 
 # Functions to Prepare Data and the UI
 ## Functions for Working With Data
@@ -30,15 +30,16 @@ getString <- function(data, id, template, keyword, pattern) {
   return(as.character(text))
 }
 
-getPalavraChave <- function(palavraChave){
-  if(is.null(palavraChave) | palavraChave == '')
-  {return(regex('(KAMDSJNAJSBDASJ)'))} else {
-    palavraChave <- str_replace_all(palavraChave, '^[^\\d\\w-]+', '')
-    palavraChave <- str_replace_all(palavraChave, '[^\\d\\w-]+$', '')
-    palavraChave <- str_split(palavraChave, '[^\\d\\w-]+')[[1]]
-    palavraChave <- str_c(palavraChave, collapse = '|')
-    palavraChave <- regex(paste0('(', palavraChave, ')'), ignore_case = TRUE)
-    return(palavraChave)}}
+
+getPalavraChave <- function(palavraChave) {
+  if (is.null(palavraChave) || palavraChave == "" || nchar(palavraChave) == 1) {
+    return(regex("(KAMDSJNAJSBDASJ)"))
+  }
+  terms <- str_extract_all(palavraChave, '"[^"]+"|\\S+')[[1]]
+  terms <- str_replace_all(terms, '^"|"$', "")
+  regex <- regex(paste0("(", paste(terms, collapse = "|"), ")"), ignore_case = TRUE)
+  return(regex)
+}
 
 ## Variables for Application Use
 make_ui <- function(x, var){
@@ -123,13 +124,13 @@ sidePanelCard <- sidebar(width = '350px',
   selectizeInput('arrange', 'Arrange by', choices = NULL,
                  selected = NULL, multiple = TRUE, width = '100%'),
   
-  hr(style = "border-top: 1px solid #000000;"),
+  hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
   
   span('Advanced Text Filtering', style = 'font-size: 16px'),
   textInput('text_to_filter', 'Text Filter', value = '', width = '100%'),
   p('This only works when there is no filter selected in the basic input panel.', style = 'font-size: 0.8rem; margin-top: 0px'),
   
-  hr(style = "border-top: 1px solid #000000;"),
+  hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
   
   span('Export Options', style = 'font-size: 16px'),
   selectInput("export_ext", "File Type", choices = c("Excel (.xlsx)" = ".xlsx", "CSV (.csv)" = ".csv", "TSV (.tsv)" = ".tsv", "Parquet (.parquet)" = ".parquet"), selected = ".xlsx"),
@@ -137,27 +138,45 @@ sidePanelCard <- sidebar(width = '350px',
   
 )
 
+configAccordion <- accordion(
+  id = "main",
+  width = "100%",
+  open = FALSE,
+  
+  accordion_panel(
+    "Configurations",
+    
+    # Nested accordion with 2 panels
+    accordion(
+      id = "config_nested",
+      width = "100%",
+      open = TRUE,
+      
+      accordion_panel(
+        "Keywords Highlighting",
+        textInput("palavraChave", "Keywords", value = NULL, width = "100%"),
+        htmlOutput("nFound")
+      ),
+      
+      accordion_panel(
+        "Data Template",
+        textAreaInput(
+          "dataTemplate",
+          "Template",
+          value = NULL,
+          width = "100%",
+          rows = 7
+        ),
+        p("Paste the template to review the data below.",
+          style = "font-size: 0.8rem; margin-top: 0px")
+      )
+    )
+  )
+)
+
 mainPanelCard <- div(class = 'main-panel',
     
-     accordion(
-       width = '100%',
-       open = FALSE,
-       accordion_panel(
-         "Keywords Highlighting",
-         textInput('palavraChave', 'Keywords', value = NULL, width = '100%'),
-         htmlOutput('nFound')
-       )),               
-     
-   accordion(
-     width = '100%',
-     open = FALSE,
-     accordion_panel(
-       "Data Template",
-       textAreaInput('dataTemplate', 'Template', value = NULL, width = '100%', rows = 5),
-       p('Paste the template to review the data below.', style = 'font-size: 0.8rem; margin-top: 0px')
-     )), 
-   
-
+   configAccordion,
    
    div(class = 'nav-button-container',
        
@@ -171,6 +190,7 @@ mainPanelCard <- div(class = 'main-panel',
    
   div(style = 'width: 100%',
     card(
+      style = "max-height: 65vh; overflow-y: auto;", 
       card_header('Data Report'),
       htmlOutput('templateDisplay', width='100%')
     )
@@ -180,18 +200,23 @@ mainPanelCard <- div(class = 'main-panel',
 navSetCardUnderline <- navset_card_underline(
   title = "Data Viewer",
   nav_panel("View",
-      div(style = "margin-bottom: 10px;",
-          selectizeInput('view_columns', 'Variables', 
-                         choices = NULL, selected = NULL, multiple = TRUE, 
-                         width = '100%',
-                         options = list(placeholder = 'Select variables to view'))
+            style = "max-height: 82vh; overflow-y: auto;",
+      card_body(
+        div(style = "margin-bottom: 10px;",
+            selectizeInput('view_columns', 'Variables', 
+                           choices = NULL, selected = NULL, multiple = TRUE, 
+                           width = '100%',
+                           options = list(placeholder = 'Select variables to view'))
+        ),
+        tableOutput('view_table')
       ),
-      tableOutput('view_table')
             ),
   nav_panel("Edit",
+            style = "max-height: 82vh; overflow-y: auto;",
             uiOutput('edit_inputs')
   ),
   nav_panel("Dictionary",
+            style = "max-height: 82vh; overflow-y: auto;",
         card_body(
             tableOutput("dictionary_table")
         )
@@ -202,7 +227,7 @@ navSetCardUnderline <- navset_card_underline(
 ui <- page_sidebar(
   # Loading Necessary Libraries
   shinyjs::useShinyjs(),
-  sidebar_width = 600,
+  sidebar_width = 650,
   # Loading Styles
   tags$script(src = "script.js"),
   tags$link(href = "style.css", rel = "stylesheet", type = "text/css"),
@@ -231,7 +256,7 @@ ui <- page_sidebar(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-
+  # bslib::bs_themer()
   data_rv <- reactiveValues(data = NULL)
   
   observeEvent(input$file, {
@@ -289,7 +314,7 @@ server <- function(input, output) {
   # Creating Outputs
   observeEvent(input$file, {
     updateSelectizeInput(inputId = 'view_columns', choices = setdiff(names(data()), "row_id"), selected = setdiff(names(data()), "row_id"), server = TRUE)
-    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', colnames(data())), server = TRUE)
+    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(data()), "row_id")), server = TRUE)
     updateSelectizeInput(inputId = 'arrange', choices = colnames(data()), server = TRUE)
     updateTextAreaInput(
       inputId = 'dataTemplate',
