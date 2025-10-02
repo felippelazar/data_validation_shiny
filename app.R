@@ -44,10 +44,22 @@ getPalavraChave <- function(palavraChave) {
 ## Variables for Application Use
 make_ui <- function(x, var){
   if(is.numeric(x)){
-    x <- as.character(x)
-    levs = c(levels(factor(x)), NA)
-    selectizeInput(var, var, choices = levs, 
-                   selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
+    uniq <- sort(unique(x[!is.na(x)]))
+    # If all differences between values are 1
+    if(length(uniq) > 1 && all(diff(uniq) == 1)) {
+      numericInput(
+        var, var,
+        value = min(uniq), # selected value is min
+        min = min(uniq),
+        max = max(uniq),
+        step = 1
+      )
+    } else {
+      x <- as.character(x)
+      levs = c(levels(factor(x)), NA)
+      selectizeInput(var, var, choices = levs, 
+                     selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
+    }
   } else if (is.character(x)){
     levs = c(levels(factor(x)), NA)
     selectizeInput(var, var, choices = levs, 
@@ -117,9 +129,15 @@ sidePanelCard <- sidebar(width = '350px',
   fileInput('file', 'File Input', 
               accept = c('.csv', '.tsv', '.xlsx', '.xls', '.parquet')),
   
-  selectizeInput('filter1', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
-  
-  uiOutput('filter11'),
+  div(
+    selectizeInput('filter1', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
+    uiOutput('filter11')
+  ),
+
+  div(style = 'display:none',
+    selectizeInput('filter2', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
+    uiOutput('filter22'),
+  ),
   
   selectizeInput('arrange', 'Arrange by', choices = NULL,
                  selected = NULL, multiple = TRUE, width = '100%'),
@@ -128,7 +146,6 @@ sidePanelCard <- sidebar(width = '350px',
   
   span('Advanced Text Filtering', style = 'font-size: 16px'),
   textInput('text_to_filter', 'Text Filter', value = '', width = '100%'),
-  p('This only works when there is no filter selected in the basic input panel.', style = 'font-size: 0.8rem; margin-top: 0px'),
   
   hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
   
@@ -258,6 +275,7 @@ ui <- page_sidebar(
 server <- function(input, output) {
   # bslib::bs_themer()
   data_rv <- reactiveValues(data = NULL)
+  file_raw <- reactiveVal(1)
   
   observeEvent(input$file, {
     ext <- tools::file_ext(input$file$name)
@@ -270,6 +288,7 @@ server <- function(input, output) {
                        validate('Invalid file; Please upload a .csv or .tsv or Excel file'))
     raw_data$row_id <- 1:nrow(raw_data)
     data_rv$data <- raw_data
+    file_raw(raw_data)
   })
   
   data <- reactive({
@@ -277,33 +296,72 @@ server <- function(input, output) {
     data_rv$data
   })
   
+
   ## Filtering the Data
   df <- reactive(
+    
     if(!(is.null(input$arrange))){
       data() %>% filter(selected()) %>% arrange(across(all_of(input$arrange)))
     } else {
       data() %>% filter(selected())
     })
   
+  text_filter_selected <- reactive({
+    dat <- data()
+    nrows <- nrow(dat)
+    sanitized <- gsub("[^A-Za-z0-9| ]", "", input$text_to_filter)
+    if(sanitized != "" && nchar(sanitized) >= 3) {
+      sapply(1:nrows, function(i) {
+        grepl(
+          sanitized,
+          paste(dat[i, setdiff(colnames(dat), "row_id")], collapse = " "),
+          ignore.case = TRUE
+        )
+      })
+    } else {
+      rep(TRUE, nrows)
+    }
+  })
+  
+  last_selected <- reactiveVal(NULL)
+  
   selected <- reactive({
-    if(input$filter1 %in% colnames(data())){filter_var(data()[[input$filter1]], input[[input$filter1]])}
-    else if(input$text_to_filter != ''){
-      grepl(regex(input$text_to_filter), ignore.case = T,
-            data() %>% mutate_all(as.character) %>% unite('all', all_of(colnames(data())), sep = ' ') %>% pull('all'))}
-    else{rep(TRUE, nrow(data()))}
+    dat <- data()
+    nrows <- nrow(dat)
+    
+    sel1 <- if(input$filter1 %in% colnames(dat) && input$filter1 != 'No Filters') {
+      filter_var(dat[[input$filter1]], input[[input$filter1]])
+    } else {
+      rep(TRUE, nrows)
+    }
+    sel2 <- if(input$filter2 %in% colnames(dat) && input$filter2 != 'No Filters') {
+      filter_var(dat[[input$filter2]], input[[input$filter2]])
+    } else {
+      rep(TRUE, nrows)
+    }
+    if(sum((sel1 & sel2 & text_filter_selected()) != last_selected()) >= 1) n(1)
+    
+    last_selected(sel1 & sel2 & text_filter_selected())
+    sel1 & sel2 & text_filter_selected()
+    
   })
   
   # Updating the Order Inputs
   reactive_vals <- reactiveValues()
   n <- reactiveVal(1)
   
+  observe({
+    if(n() > nrow(df())) n(1)
+  })
+  
+  observeEvent(list(input$filter1, input$filter2, input$filter2, input$filter2), {
+    n(1)
+  })
+  
   observeEvent(input$btnext1, {n(min(n() + 1, nrow(df())))})
   observeEvent(input$btnext100, {n(min(n() + 100, nrow(df())))})
   observeEvent(input$btprevious1, {n(max(n() - 1, 1))})
   observeEvent(input$btprevious100, {n(max(n() - 100, 1))})
-  
-  observeEvent(input$arrange, { n(1) })
-  observeEvent(input$filter1, { n(1) })
   
   # Creating Intermediate Variables
   reactive_vals$palavraChave <- reactive({getPalavraChave(input$palavraChave)})
@@ -313,14 +371,20 @@ server <- function(input, output) {
   
   # Creating Outputs
   observeEvent(input$file, {
-    updateSelectizeInput(inputId = 'view_columns', choices = setdiff(names(data()), "row_id"), selected = setdiff(names(data()), "row_id"), server = TRUE)
-    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(data()), "row_id")), server = TRUE)
-    updateSelectizeInput(inputId = 'arrange', choices = colnames(data()), server = TRUE)
+    updateSelectizeInput(inputId = 'view_columns', choices = setdiff(names(file_raw()), "row_id"), selected = setdiff(names(file_raw()), "row_id"), server = TRUE)
+
+    updateSelectizeInput(inputId = 'arrange', choices = colnames(file_raw()), server = TRUE)
     updateTextAreaInput(
       inputId = 'dataTemplate',
-      value = paste0("#", setdiff(names(data()), "row_id"), ": {`", setdiff(names(data()), "row_id"), "`}", collapse = "\n")
+      value = paste0("#", setdiff(names(file_raw()), "row_id"), ": {`", setdiff(names(file_raw()), "row_id"), "`}", collapse = "\n")
     )
-    output$filter11 <- renderUI(make_ui(data()[[input$filter1]], input$filter1))
+    
+    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(file_raw()), "row_id")), selected = input$filter1, server = TRUE)
+    output$filter11 <- renderUI(make_ui(file_raw()[[input$filter1]], input$filter1))
+    
+    updateSelectizeInput(inputId = 'filter2', choices = c('No Filters', setdiff(names(file_raw()), "row_id")), selected = input$filter2, server = TRUE)
+    output$filter22 <- renderUI(make_ui(file_raw()[[input$filter2]], input$filter2))
+    
     })
   output$templateDisplay <- renderText({HTML(reactive_vals$text())})
   output$nFound <- renderText({
@@ -356,9 +420,9 @@ server <- function(input, output) {
     
     div(
       style = "padding: 15px;",
-      edit_ui_list,
+      actionButton('save_edit', 'Save Changes', class = 'btn-primary', icon = icon('save')),
       hr(),
-      actionButton('save_edit', 'Save Changes', class = 'btn-primary', icon = icon('save'))
+      edit_ui_list
     )
   })
   
