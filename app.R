@@ -42,6 +42,7 @@ getPalavraChave <- function(palavraChave) {
 }
 
 ## Variables for Application Use
+## Variables for Application Use
 make_ui <- function(x, var){
   if(is.numeric(x)){
     uniq <- sort(unique(x[!is.na(x)]))
@@ -55,14 +56,24 @@ make_ui <- function(x, var){
         step = 1
       )
     } else {
-      x <- as.character(x)
-      levs = c(levels(factor(x)), NA)
-      selectizeInput(var, var, choices = levs, 
+      x_chr <- as.character(x)
+      levs <- levels(factor(x_chr))
+      choices <- setNames(levs, levs)
+      # Add "Missing" label only if there are missing values
+      if(any(is.na(x))){
+        choices <- c(choices, "Missing" = "NA")
+      }
+      selectizeInput(var, var, choices = choices, 
                      selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
     }
   } else if (is.character(x)){
-    levs = c(levels(factor(x)), NA)
-    selectizeInput(var, var, choices = levs, 
+    levs <- levels(factor(x))
+    choices <- setNames(levs, levs)
+    # Add "Missing" label only if there are missing values
+    if(any(is.na(x))){
+      choices <- c(choices, "Missing" = "NA")
+    }
+    selectizeInput(var, var, choices = choices, 
                    selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
   } else {
     NULL
@@ -123,24 +134,30 @@ filter_var <- function(x, val){
 sidePanelCard <- sidebar(width = '350px',
   
   span('✦ Input Panel', style = 'font-size: 18px'),
-  span('Basic Input', style = 'font-size: 16px'),
-
 
   fileInput('file', 'File Input', 
               accept = c('.csv', '.tsv', '.xlsx', '.xls', '.parquet')),
   
+  uiOutput("progressUI"),
+  
+  span('Basic Filtering', style = 'font-size: 16px'),
+  
   div(
-    selectizeInput('filter1', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
-    uiOutput('filter11')
+    class='d-flex flex-column gap-1',
+    div(
+      selectizeInput('filter1', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
+      uiOutput('filter11')
+    ),
+    
+    div(style = 'display:none',
+        selectizeInput('filter2', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
+        uiOutput('filter22'),
+    ),
+    
+    selectizeInput('arrange', 'Arrange by', choices = NULL,
+                   selected = NULL, multiple = TRUE, width = '100%'),
   ),
 
-  div(style = 'display:none',
-    selectizeInput('filter2', 'Filter by', choices = NULL, selected = 'Sem Filtro'),
-    uiOutput('filter22'),
-  ),
-  
-  selectizeInput('arrange', 'Arrange by', choices = NULL,
-                 selected = NULL, multiple = TRUE, width = '100%'),
   
   hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
   
@@ -196,13 +213,13 @@ mainPanelCard <- div(class = 'main-panel',
    configAccordion,
    
    div(class = 'nav-button-container',
-       
-       actionButton('btprevious100', '', icon=icon('backward'), style="text-align: center; background-color: #95a5a6; border: none", class = "btn-info btn-nav"),
-       actionButton('btprevious1', '', icon=icon('arrow-left'), style="text-align: center; background-color: #95a5a6; border: none", class = "btn-info btn-nav"),
-       div(class='n-current', htmlOutput('nCurrent')),
-       actionButton('btnext1', '', icon=icon('arrow-right'), style="text-align: center; border: none", class = "btn-primary btn-nav"),
-       actionButton('btnext100', '', icon=icon('forward'), style="text-align: center; border: none", class = "btn-primary btn-nav")
-       
+       actionButton('btprevious100', '', icon = icon('backward'), style = "text-align: center;", class = "btn-nav btn-light", type = 'button', `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 100"),
+       actionButton('btprevious10', '', icon = icon('angle-double-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 10"),
+       actionButton('btprevious1', '', icon = icon('arrow-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 1"),
+       div(class = 'n-current', htmlOutput('nCurrent')),
+       actionButton('btnext1', '', icon = icon('arrow-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 1"),
+       actionButton('btnext10', '', icon = icon('angle-double-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 10"),
+       actionButton('btnext100', '', icon = icon('forward'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 100")
    ),
    
   div(style = 'width: 100%',
@@ -277,6 +294,9 @@ server <- function(input, output) {
   data_rv <- reactiveValues(data = NULL)
   file_raw <- reactiveVal(1)
   
+  n_rows <- reactiveVal(1)
+  n_validated <- reactiveVal(1)
+  
   observeEvent(input$file, {
     ext <- tools::file_ext(input$file$name)
     raw_data <- switch(ext,
@@ -286,7 +306,18 @@ server <- function(input, output) {
                        xls = read_excel(input$file$datapath),
                        parquet = read_parquet(input$file$datapath),
                        validate('Invalid file; Please upload a .csv or .tsv or Excel file'))
+    
     raw_data$row_id <- 1:nrow(raw_data)
+    
+    validation_levels <- c("validated", "unvalidated")
+    if(!'data_validated' %in% names(raw_data)) raw_data$data_validated <- 'unvalidated'
+    if(!all(unique(raw_data$data_validated) %in% validation_levels)) raw_data$data_validated <- 'unvalidated'
+    raw_data <- dplyr::relocate(raw_data, 'data_validated', .before = 1)
+    
+    # Getting the Number of Rows for Progress Bar
+    n_rows(nrow(raw_data))
+    n_validated(sum(raw_data$data_validated == 'validated'))
+    
     data_rv$data <- raw_data
     file_raw(raw_data)
   })
@@ -306,6 +337,8 @@ server <- function(input, output) {
       data() %>% filter(selected())
     })
   
+  last_selected <- reactiveVal(NULL)
+  
   text_filter_selected <- reactive({
     dat <- data()
     nrows <- nrow(dat)
@@ -323,8 +356,6 @@ server <- function(input, output) {
     }
   })
   
-  last_selected <- reactiveVal(NULL)
-  
   selected <- reactive({
     dat <- data()
     nrows <- nrow(dat)
@@ -334,11 +365,13 @@ server <- function(input, output) {
     } else {
       rep(TRUE, nrows)
     }
+    
     sel2 <- if(input$filter2 %in% colnames(dat) && input$filter2 != 'No Filters') {
       filter_var(dat[[input$filter2]], input[[input$filter2]])
     } else {
       rep(TRUE, nrows)
     }
+    
     if(sum((sel1 & sel2 & text_filter_selected()) != last_selected()) >= 1) n(1)
     
     last_selected(sel1 & sel2 & text_filter_selected())
@@ -350,17 +383,15 @@ server <- function(input, output) {
   reactive_vals <- reactiveValues()
   n <- reactiveVal(1)
   
-  observe({
-    if(n() > nrow(df())) n(1)
-  })
-  
   observeEvent(list(input$filter1, input$filter2, input$filter2, input$filter2), {
     n(1)
   })
   
   observeEvent(input$btnext1, {n(min(n() + 1, nrow(df())))})
+  observeEvent(input$btnext10, {n(min(n() + 10, nrow(df())))})
   observeEvent(input$btnext100, {n(min(n() + 100, nrow(df())))})
   observeEvent(input$btprevious1, {n(max(n() - 1, 1))})
+  observeEvent(input$btprevious10, {n(max(n() - 10, 1))})
   observeEvent(input$btprevious100, {n(max(n() - 100, 1))})
   
   # Creating Intermediate Variables
@@ -368,6 +399,7 @@ server <- function(input, output) {
   reactive_vals$text <- reactive(getString(df(), n(), input$dataTemplate, reactive_vals$palavraChave(), reactive_vals$chavePattern()))
   reactive_vals$chavePattern <- reactive('<span class="highlighted-text">\\1</span>')
   reactive_vals$nFound <- reactive({sum(str_count(reactive_vals$text(), 'highlighted-text'))})
+  
   
   # Creating Outputs
   observeEvent(input$file, {
@@ -379,20 +411,36 @@ server <- function(input, output) {
       value = paste0("#", setdiff(names(file_raw()), "row_id"), ": {`", setdiff(names(file_raw()), "row_id"), "`}", collapse = "\n")
     )
     
-    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(file_raw()), "row_id")), selected = input$filter1, server = TRUE)
+    updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(file_raw()), c("row_id"))), selected = input$filter1, server = TRUE)
     output$filter11 <- renderUI(make_ui(file_raw()[[input$filter1]], input$filter1))
     
-    updateSelectizeInput(inputId = 'filter2', choices = c('No Filters', setdiff(names(file_raw()), "row_id")), selected = input$filter2, server = TRUE)
+    updateSelectizeInput(inputId = 'filter2', choices = c('No Filters', setdiff(names(file_raw()), c("row_id"))), selected = input$filter2, server = TRUE)
     output$filter22 <- renderUI(make_ui(file_raw()[[input$filter2]], input$filter2))
     
     })
+  
+  observeEvent(input$filter1, {
+    
+    if(input$filter1 == 'data_validated') output$filter11 <- renderUI(selectizeInput('data_validated', 'data_validated', choices = c('validated', 'unvalidated'), selected = NULL))
+    
+  })
+  
+  
   output$templateDisplay <- renderText({HTML(reactive_vals$text())})
   output$nFound <- renderText({
     HTML(paste0('<span class="found-words">Number of words found: ', 
                 '<b> ', reactive_vals$nFound(),'</b></span>'))})
-  output$nCurrent <- renderText(
-    HTML(paste0('<b style="font-size: 30px; text-align: center;">', 
-                as.character(n()), ' / ', as.character(nrow(df())), '</b></span>')))
+  
+  observe({
+    if(n() > nrow(df())) n(1)
+    if(nrow(df()) == 0) {
+      output$nCurrent <- renderText(HTML(paste0('<b style="font-size: 30px; text-align: center;"> 0/0 </b></span>')))
+    } else {
+      output$nCurrent <- renderText(
+        HTML(paste0('<b style="font-size: 30px; text-align: center;">  ', 
+                    as.character(n()), ' / ', as.character(nrow(df())), '  </b></span>')))
+    }
+  })
   
   # Creating View Panel
   output$view_table <- renderTable({
@@ -409,19 +457,22 @@ server <- function(input, output) {
   output$edit_inputs <- renderUI({
     req(input$view_columns)
     req(nrow(df()) > 0)
+
+    current_row <- df()[n(), c(input$view_columns, 'data_validated'), drop = FALSE]
+
+    validated_value <- current_row[['data_validated']] == 'validated'
     
-    current_row <- df()[n(), input$view_columns, drop = FALSE]
-    
-    edit_ui_list <- lapply(setdiff(input$view_columns, "row_id"), function(col_name) {
+    edit_ui_list <- lapply(setdiff(input$view_columns, c("row_id", 'data_validated')), function(col_name) {
       col_value <- current_row[[col_name]]
       col_data <- data()[[col_name]]
-      make_edit_ui(col_data, col_name, col_value) 
+      make_edit_ui(col_data, col_name, col_value)
     })
-    
+
     div(
       style = "padding: 15px;",
       actionButton('save_edit', 'Save Changes', class = 'btn-primary', icon = icon('save')),
       hr(),
+      bslib::input_switch(id = "data_validated_input", label = "Data Validated?", value = validated_value),
       edit_ui_list
     )
   })
@@ -445,11 +496,8 @@ server <- function(input, output) {
     req(nrow(df()) > 0)
     current_row_id <- df()[n(), "row_id", drop = TRUE]
     original_row_index <- which(data_rv$data$row_id == current_row_id)
-    str(df())
-    str(data_rv$data)
-    print(current_row_id)
     
-    for(col_name in input$view_columns) {
+    for(col_name in setdiff(input$view_columns, 'data_validated')) {
       if(col_name != "row_id") {
         new_value <- input[[paste0("edit_", col_name)]]
         if(inherits(data_rv$data[[col_name]], "Date") || inherits(data_rv$data[[col_name]], "POSIXct")){
@@ -462,6 +510,10 @@ server <- function(input, output) {
         data_rv$data[[col_name]][original_row_index] <- new_value
       }
     }
+    
+    data_rv$data[['data_validated']][original_row_index] <- ifelse(input[['data_validated_input']], 'validated', 'unvalidated')
+    n_validated(sum(data_rv$data[['data_validated']] == 'validated'))
+    
     showNotification("Changes saved successfully!", type = "message", duration = 3)
   })
   
@@ -478,6 +530,28 @@ server <- function(input, output) {
     }
   )
 
+  output$progressUI <- renderUI({
+    req(nrow(df()) > 0)
+    
+    pct <- round(100 * n_validated() / n_rows())
+    
+    div(class = 'd-flex flex-column gap-0',
+        p('Validation Progress Bar'),
+        div(
+          class = "progress",
+          style = "height: 25px; position: relative;",
+          div(
+            class = "progress-bar bg-success",
+            role = "progressbar",
+            style = sprintf("width: %d%%;", pct)
+          ),
+          div(
+            style = "position: absolute; width: 100%; text-align: center; color: black; top: 0;",
+            sprintf("%d / %d (%d%% complete)", n_validated(), n_rows(), pct)
+          )
+        )
+    )
+  })
   
 }
 

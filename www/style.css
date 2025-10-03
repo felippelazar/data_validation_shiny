@@ -85,8 +85,8 @@
   padding: 8px 5px; 
 }
 
-.n-current {
-  padding: 5px 5px;
+#nCurrent {
+  padding: 5px 15px;
 }
 
 .card .highlighted-text, .card-body .highlighted-text {
@@ -119,4 +119,8 @@
 
 .accordion-button:not(.collapsed) {
   background: rgba(33, 37, 41, 0.03);
+}
+
+#basic_filtering {
+  margin-bottom: 0px;
 }
