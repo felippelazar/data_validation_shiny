@@ -64,7 +64,7 @@ make_ui <- function(x, var){
         choices <- c(choices, "Missing" = "NA")
       }
       selectizeInput(var, var, choices = choices, 
-                     selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
+                     selected = NULL, multiple = FALSE, options = list(maxOptions = 15))
     }
   } else if (is.character(x)){
     levs <- levels(factor(x))
@@ -74,7 +74,7 @@ make_ui <- function(x, var){
       choices <- c(choices, "Missing" = "NA")
     }
     selectizeInput(var, var, choices = choices, 
-                   selected = NULL, multiple = FALSE, options = list(maxOptions = 10))
+                   selected = NULL, multiple = FALSE, options = list(maxOptions = 15))
   } else {
     NULL
   }
@@ -92,20 +92,20 @@ make_edit_ui <- function(x, var, current_value){
     valid_value <- suppressWarnings(as.numeric(current_value))
     numericInput(paste0("edit_", var), var, value = valid_value, width = '100%')
     
-  } else if(is.factor(x) && n_levels <= 10){
+  } else if(is.factor(x) && n_levels <= 20){
     levs <- levels(x)
     selectizeInput(
       paste0("edit_", var), var, choices = levs,
       selected = current_value, multiple = FALSE,
-      options = list(maxOptions = 10, create = TRUE), width = '100%'
+      options = list(maxOptions = 20, create = TRUE), width = '100%'
     )
   } else if(is.character(x)){
     char_levels <- unique(x[!is.na(x)])
-    if(length(char_levels) <= 10){
+    if(length(char_levels) <= 20){
       selectizeInput(
         paste0("edit_", var), var, choices = char_levels,
         selected = current_value, multiple = FALSE,
-        options = list(maxOptions = 10, create = TRUE), width = '100%'
+        options = list(maxOptions = 20, create = TRUE), width = '100%'
       )
     } else {
       textInput(paste0("edit_", var), var, value = current_value, width = '100%')
@@ -213,13 +213,21 @@ mainPanelCard <- div(class = 'main-panel',
    configAccordion,
    
    div(class = 'nav-button-container',
-       actionButton('btprevious100', '', icon = icon('backward'), style = "text-align: center;", class = "btn-nav btn-light", type = 'button', `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 100"),
-       actionButton('btprevious10', '', icon = icon('angle-double-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 10"),
-       actionButton('btprevious1', '', icon = icon('arrow-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 1"),
+       
+       div(
+         actionButton('btprevious100', '', icon = icon('backward'), style = "text-align: center;", class = "btn-nav btn-light", type = 'button', `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 100"),
+         actionButton('btprevious10', '', icon = icon('angle-double-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 10"),
+         actionButton('btprevious1', '', icon = icon('arrow-left'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "left", title = "Back 1"),
+       ),
+       
        div(class = 'n-current', htmlOutput('nCurrent')),
-       actionButton('btnext1', '', icon = icon('arrow-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 1"),
-       actionButton('btnext10', '', icon = icon('angle-double-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 10"),
-       actionButton('btnext100', '', icon = icon('forward'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 100")
+       
+       div(
+         actionButton('btnext1', '', icon = icon('arrow-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 1"),
+         actionButton('btnext10', '', icon = icon('angle-double-right'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 10"),
+         actionButton('btnext100', '', icon = icon('forward'), style = "text-align: center;", class = "btn-nav btn-light", `data-bs-toggle` = "tooltip", `data-bs-placement` = "right", title = "Next 100")
+       ),
+       
    ),
    
   div(style = 'width: 100%',
@@ -403,7 +411,7 @@ server <- function(input, output) {
   
   # Creating Outputs
   observeEvent(input$file, {
-    updateSelectizeInput(inputId = 'view_columns', choices = setdiff(names(file_raw()), "row_id"), selected = setdiff(names(file_raw()), "row_id"), server = TRUE)
+    updateSelectizeInput(inputId = 'view_columns', choices = setdiff(names(file_raw()), "row_id"), selected = head(setdiff(names(file_raw()), "row_id"), 10), server = TRUE)
 
     updateSelectizeInput(inputId = 'arrange', choices = colnames(file_raw()), server = TRUE)
     updateTextAreaInput(
@@ -412,17 +420,14 @@ server <- function(input, output) {
     )
     
     updateSelectizeInput(inputId = 'filter1', choices = c('No Filters', setdiff(names(file_raw()), c("row_id"))), selected = input$filter1, server = TRUE)
-    output$filter11 <- renderUI(make_ui(file_raw()[[input$filter1]], input$filter1))
-    
     updateSelectizeInput(inputId = 'filter2', choices = c('No Filters', setdiff(names(file_raw()), c("row_id"))), selected = input$filter2, server = TRUE)
-    output$filter22 <- renderUI(make_ui(file_raw()[[input$filter2]], input$filter2))
     
     })
   
-  observeEvent(input$filter1, {
-    
-    if(input$filter1 == 'data_validated') output$filter11 <- renderUI(selectizeInput('data_validated', 'data_validated', choices = c('validated', 'unvalidated'), selected = NULL))
-    
+  observe({
+    req(input$file)
+    if(input$filter1 == 'data_validated') output$filter11 <- renderUI(selectizeInput('data_validated', 'data_validated', choices = c('validated', 'unvalidated'), selected = NULL)) else output$filter11 <- renderUI(make_ui(file_raw()[[input$filter1]], input$filter1))
+    if(input$filter2 == 'data_validated') output$filter22 <- renderUI(selectizeInput('data_validated', 'data_validated', choices = c('validated', 'unvalidated'), selected = NULL)) else output$filter22 <- renderUI(make_ui(file_raw()[[input$filter2]], input$filter2))
   })
   
   
@@ -467,7 +472,15 @@ server <- function(input, output) {
       col_data <- data()[[col_name]]
       make_edit_ui(col_data, col_name, col_value)
     })
-
+    
+    # Create vector of input IDs
+    edit_input_ids <- paste0("edit_", setdiff(input$view_columns, c("row_id", "data_validated")))
+    
+    # Save to a reactive value for use outside renderUI
+    # You might want to use a reactiveVal or reactiveValues for this
+    rv_edit$edit_input_ids <- edit_input_ids
+    rv_edit$n_changes <- 0
+    
     div(
       style = "padding: 15px;",
       actionButton('save_edit', 'Save Changes', class = 'btn-primary', icon = icon('save')),
@@ -476,6 +489,24 @@ server <- function(input, output) {
       edit_ui_list
     )
   })
+  
+  # ReactiveValues to store input IDs
+  rv_edit <- reactiveValues(edit_input_ids = NULL, n_changes = NULL)
+  
+  # Observe changes to any edit input
+  observeEvent(
+    lapply(rv_edit$edit_input_ids, function(id) input[[id]]),
+    {
+      if(rv_edit$n_changes <= 1) {
+        # First event after creation: just clear the flag, don't update switch
+        rv_edit$n_changes <- rv_edit$n_changes + 1
+      } else {
+        # All subsequent changes: update switch
+        update_switch(id = "data_validated_input", value = TRUE)
+      }
+    },
+    ignoreInit = TRUE
+  )
   
   # Creating Dictionary Nav Panel
   output$dictionary_table <- renderTable({
@@ -540,13 +571,26 @@ server <- function(input, output) {
         div(
           class = "progress",
           style = "height: 25px; position: relative;",
+          
+          # Progress bar
           div(
             class = "progress-bar bg-success",
             role = "progressbar",
             style = sprintf("width: %d%%;", pct)
           ),
+          
+          # Centered text overlay
           div(
-            style = "position: absolute; width: 100%; text-align: center; color: black; top: 0;",
+            style = "
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+            font-weight: 500;
+          ",
             sprintf("%d / %d (%d%% complete)", n_validated(), n_rows(), pct)
           )
         )
