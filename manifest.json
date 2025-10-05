@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "locale": "en_US",
+  "platform": "shiny",
+  "primary": "app.R",
+  "files": [
+    "app.R",
+    "www/style.css",
+    "www/script.js"
+  ],
+  "packages": [
+    "shiny",
+    "shinyWidgets",
+    "tidyverse",
+    "ggplot2",
+    "readxl",
+    "arrow",
+    "janitor",
+    "bslib",
+    "glue",
+    "shinyjs",
+    "rio"
+  ],
+  "description": "A Shiny application for interactive data validation with filtering, editing, and export capabilities.",
+  "entrypoint": "app.R"
+}
