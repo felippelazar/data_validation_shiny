@@ -161,7 +161,9 @@ sidePanelCard <- sidebar(width = '350px',
   
   hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
   
-  span('Advanced Text Filtering', style = 'font-size: 16px'),
+  span('Advanced Configurations', style = 'font-size: 16px'),
+  
+  bslib::input_switch(id = "edit_all_slice", label = "Edit all Sliced (Filtered) Data", value = FALSE),
   textInput('text_to_filter', 'Text Filter', value = '', width = '100%'),
   
   hr(style = "border-top: 1px solid #000000; margin: 2px 0px"),
@@ -538,11 +540,11 @@ server <- function(input, output) {
         } else if(new_value == ""){
           new_value <- NA
         }
-        data_rv$data[[col_name]][original_row_index] <- new_value
+        if(input$edit_all_slice) data_rv$data[[col_name]][selected()] <- new_value else data_rv$data[[col_name]][original_row_index] <- new_value
       }
     }
     
-    data_rv$data[['data_validated']][original_row_index] <- ifelse(input[['data_validated_input']], 'validated', 'unvalidated')
+    if(input$edit_all_slice) data_rv$data[['data_validated']][selected()] <- ifelse(input[['data_validated_input']], 'validated', 'unvalidated') else data_rv$data[['data_validated']][original_row_index] <- ifelse(input[['data_validated_input']], 'validated', 'unvalidated')
     n_validated(sum(data_rv$data[['data_validated']] == 'validated'))
     
     showNotification("Changes saved successfully!", type = "message", duration = 3)
