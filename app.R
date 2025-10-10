@@ -382,7 +382,7 @@ server <- function(input, output) {
       rep(TRUE, nrows)
     }
     
-    if(sum((sel1 & sel2 & text_filter_selected()) != last_selected()) >= 1) n(1)
+    if(sum((sel1 & sel2 & text_filter_selected()) != last_selected()) >= 2) n(1)
     
     last_selected(sel1 & sel2 & text_filter_selected())
     sel1 & sel2 & text_filter_selected()
