@@ -21,7 +21,7 @@ function isFormElementFocused() {
 }
 
 $(document).on('keydown', function(e) {
-  if (e.key === 'ArrowUp' && e.ctrlKey) {
+  if (e.key === 'ArrowUp' && e.altKey) {
     // If a form element is focused, prevent default and blur it
     if (isFormElementFocused()) {
       e.preventDefault();
@@ -52,7 +52,7 @@ $(document).on('keydown', function(e) {
 });
 
 $(document).on('keydown', function(e) {
-  if (e.key === 'ArrowDown' && e.ctrlKey) {
+  if (e.key === 'ArrowDown' && e.altKey) {
     // If a form element is focused, prevent default and blur it
     if (isFormElementFocused()) {
       e.preventDefault();
