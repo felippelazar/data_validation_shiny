@@ -8,7 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY . /srv/shiny-server/app
 
-RUN R -e "if (file.exists('/srv/shiny-server/app/renv.lock')) { install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore(project = '/srv/shiny-server/app', prompt = FALSE) } else { message('No renv.lock found; skipping renv restore.') }"
+RUN R -e "if (file.exists('/srv/shiny-server/app/renv.lock')) install.packages('renv', repos = 'https://cloud.r-project.org')"
+
+RUN R -e "if (file.exists('/srv/shiny-server/app/renv.lock')) { renv::restore(project = '/srv/shiny-server/app', prompt = FALSE) } else { message('No renv.lock found; skipping renv restore.') }"
 
 RUN chown -R shiny:shiny /srv/shiny-server
 
